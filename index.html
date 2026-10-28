@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Adaptive Round Robin Control Room</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header class="topbar">
+  <div class="brandmark">RR</div>
+  <div><div class="eyebrow">OPERATING SYSTEMS LAB</div><h1>Adaptive Round Robin <span>Control Room</span></h1></div>
+  <div class="top-status"><i></i> Interactive simulator</div>
+</header>
+<main>
+  <section class="intro">
+    <div><div class="eyebrow light">SMART TIME SLICE · LIVE QUEUE</div><h2>See every decision.<br><em>One CPU slice at a time.</em></h2>
+      <p>Compare fixed-quantum Round Robin with Adaptive RR. Step through the queue, inspect each process, and see why the scheduler chose its time quantum.</p></div>
+    <div class="intro-graphic" aria-hidden="true"><div class="cpu-box">CPU</div><div class="flow-line"></div><div class="mini-queue"><span>P1</span><span>P2</span><span>P3</span><span>···</span></div><div class="graphic-label">READY QUEUE → CPU</div></div>
+  </section>
+
+  <nav class="tabs" aria-label="Main sections">
+    <button class="tab active" data-tab="input"> <b>01</b> Workload & setup</button>
+    <button class="tab" data-tab="simulation"><b>02</b> Step-by-step simulation</button>
+    <button class="tab" data-tab="compare"><b>03</b> Compare & metrics</button>
+  </nav>
+
+  <section id="tab-input" class="tab-panel active">
+    <div class="section-heading"><div><div class="eyebrow">CONFIGURE</div><h2>Process workload</h2><p>Edit arrivals and bursts, or load a preset.</p></div>
+      <div class="setup-controls"><label>Example workload<select id="preset"></select></label><label>Traditional quantum (ms)<input id="fixedQuantum" type="number" min="1" step="1" value="20"></label><label>Smart quantum mode<select id="mode"><option value="auto">Auto-select best</option><option value="mean">Always use mean</option><option value="median">Always use median</option></select></label></div>
+    </div>
+    <div class="workspace">
+      <div class="card workload-card">
+        <div class="card-title"><div><h3>Process table</h3><p>Each row becomes P1, P2, P3…</p></div><span class="count-pill" id="processCount">10 processes</span></div>
+        <div class="table-wrap"><table><thead><tr><th>Process</th><th>Arrival time (ms)</th><th>Burst time (ms)</th><th></th></tr></thead><tbody id="processRows"></tbody></table></div>
+        <div class="table-actions"><button id="addProcess" class="btn btn-light">＋ Add process</button><button id="resetWorkload" class="text-btn">Restore sample</button></div>
+        <div id="error" class="error hidden"></div>
+      </div>
+      <aside class="card quantum-card">
+        <div class="eyebrow">SMART TIME SLICE</div><h3>Both candidates. One choice.</h3>
+        <p class="muted">The engine simulates mean and median candidates against this workload. It doesn't branch on odd/even process count.</p>
+        <div class="candidate-grid"><div class="candidate"><span>MEAN</span><strong id="meanValue">—</strong><small>average burst</small></div><div class="candidate"><span>MEDIAN</span><strong id="medianValue">—</strong><small>middle burst value</small></div></div>
+        <div class="selected-quantum"><div><span class="check">✓</span><span>Selected quantum</span></div><strong id="selectedValue">—</strong><p id="selectionReason">Run the simulation to evaluate candidates.</p></div>
+        <button id="runSimulation" class="btn btn-primary full">Run simulation <span>→</span></button>
+        <div class="rule-note"><span class="rule-icon">i</span><span><b>Selection rule</b><br>Lowest average waiting time wins. Ties: fewer context switches, then lower response time.</span></div>
+      </aside>
+    </div>
+  </section>
+
+  <section id="tab-simulation" class="tab-panel">
+    <div class="section-heading"><div><div class="eyebrow">PLAYBACK</div><h2>Step-by-step simulation</h2><p>Advance one CPU slice at a time. The queue updates after each step.</p></div>
+      <div class="scheduler-toggle"><button class="sched-btn active" data-scheduler="adaptive">Adaptive RR</button><button class="sched-btn" data-scheduler="traditional">Traditional RR</button></div>
+    </div>
+    <div id="simulationEmpty" class="empty-state card"><div class="empty-icon">▶</div><h3>Ready when you are</h3><p>Run a simulation from the first tab to explore the CPU schedule.</p><button class="btn btn-primary" data-goto="input">Set up workload</button></div>
+    <div id="simulationContent" class="hidden">
+      <div class="playback-toolbar card">
+        <div><span class="eyebrow">CURRENT SCHEDULER</span><h3 id="playbackTitle">Adaptive RR</h3><p id="playbackSubtitle" class="muted"></p></div>
+        <div class="playback-controls"><button id="resetStep" class="btn btn-light">↺ Reset</button><button id="prevStep" class="btn btn-light">← Prev</button><button id="nextStep" class="btn btn-primary">Next step →</button><button id="finishSteps" class="btn btn-light">Run to end ↠</button></div>
+      </div>
+      <div class="progress-line"><div id="progressFill"></div></div><div id="stepCount" class="progress-label">Step 0</div>
+      <div class="stats-grid four" id="liveStats"></div>
+      <div class="queue-layout">
+        <div class="card queue-card"><div class="card-title"><div><h3>Ready queue</h3><p>Front of queue is on the left.</p></div><span class="live-dot">LIVE</span></div><div class="queue-stage"><div class="queue-side"><label>QUEUE BEFORE</label><div id="queueBefore" class="queue-items"></div></div><div class="cpu-stage"><div class="cpu-icon">CPU</div><div class="cpu-arrow">→</div><strong id="cpuProcess">—</strong><small id="cpuDuration">Waiting for first step</small></div><div class="queue-side"><label>QUEUE AFTER</label><div id="queueAfter" class="queue-items"></div></div></div><div id="stepNarrative" class="narrative"><b>Start here.</b> Press Next step to dispatch the first process.</div></div>
+        <div class="card completed-card"><div class="card-title"><div><h3>Completed</h3><p>Processes that have left the system.</p></div></div><div id="completedList" class="completed-list"></div><div class="divider"></div><h4>Not arrived yet</h4><div id="notArrived" class="not-arrived"></div></div>
+      </div>
+      <div class="card gantt-card"><div class="card-title"><div><h3>Gantt timeline</h3><p>Highlighted block is the latest CPU slice.</p></div><span class="legend-note">Time →</span></div><div id="stepGantt" class="gantt-scroll"></div></div>
+      <div class="card status-card"><div class="card-title"><div><h3>Process status</h3><p>Remaining burst and completion state.</p></div></div><div class="table-wrap"><table><thead><tr><th>Process</th><th>Arrival</th><th>Burst</th><th>Remaining</th><th>Progress</th><th>Status</th><th>Completion</th></tr></thead><tbody id="statusRows"></tbody></table></div></div>
+    </div>
+  </section>
+
+  <section id="tab-compare" class="tab-panel">
+    <div class="section-heading"><div><div class="eyebrow">RESULTS</div><h2>Compare the schedulers</h2><p>Judge the workload using multiple metrics, not just one number.</p></div><button class="btn btn-light" id="downloadCsv">↓ Download CSV</button></div>
+    <div id="compareEmpty" class="empty-state card"><div class="empty-icon">▥</div><h3>No results yet</h3><p>Run the simulation to compare the two scheduling methods.</p><button class="btn btn-primary" data-goto="input">Set up workload</button></div>
+    <div id="compareContent" class="hidden"><div id="comparisonMetrics" class="stats-grid five"></div><div class="card comparison-card"><div class="card-title"><div><h3>Metric comparison</h3><p>Adaptive results compared with Traditional RR.</p></div></div><div class="table-wrap"><table><thead><tr><th>Metric</th><th>Traditional RR</th><th>Adaptive RR</th><th>Change</th></tr></thead><tbody id="comparisonRows"></tbody></table></div><div id="comparisonInsight" class="insight"></div></div>
+      <div class="charts-grid"><div class="card"><div class="card-title"><div><h3>Traditional RR</h3><p id="tradGanttSub"></p></div></div><div id="tradGantt" class="gantt-scroll"></div></div><div class="card"><div class="card-title"><div><h3>Adaptive RR</h3><p id="adaptGanttSub"></p></div></div><div id="adaptGantt" class="gantt-scroll"></div></div></div>
+      <div class="card"><div class="card-title"><div><h3>Waiting time by process</h3><p>Lower bars indicate less time spent waiting.</p></div></div><div id="waitingChart" class="waiting-chart"></div></div>
+      <div class="card"><div class="card-title"><div><h3>Smart Time Slice decision</h3><p>Why the engine selected this candidate.</p></div></div><div class="table-wrap"><table><thead><tr><th>Candidate</th><th>Quantum</th><th>Avg waiting</th><th>Context switches</th><th>Avg response</th><th>Decision</th></tr></thead><tbody id="candidateRows"></tbody></table></div></div>
+      <div class="card"><div class="card-title"><div><h3>Per-process details</h3><p>Completion, waiting, and response times.</p></div></div><div class="table-wrap"><table><thead><tr><th>Process</th><th>Arrival</th><th>Burst</th><th>Traditional completion</th><th>Adaptive completion</th><th>Traditional waiting</th><th>Adaptive waiting</th><th>Traditional response</th><th>Adaptive response</th></tr></thead><tbody id="detailRows"></tbody></table></div></div>
+    </div>
+  </section>
+  <footer><span>Adaptive Round Robin Simulator</span><span>Flask · HTML · CSS · JavaScript</span></footer>
+</main>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body></html>
